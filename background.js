@@ -3,6 +3,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /* eslint-disable no-undef */
+
+// Track engine creation state
+let isSummarizationEngineCreated = false;
+
 /**
  * Called in the tab content to generate alt text for an image
  */
@@ -31,23 +35,66 @@ async function summarizeText(inputText, useModal = false) {
     modal.updateText("Running summarization...");
   }
   try {
-    console.log("Creating summarization engine...");
-    await browser.trial.ml.createEngine({
-      modelHub: "mozilla",
-      taskName: "summarization",
-    });
-    console.log("Running summarization inference...");
-    const res = await browser.trial.ml.runEngine({
-      args: [inputText],
-      taskName: "summarization",
-    });
-    console.log("Summarization result:", res);
-    if (useModal) {
-      modal.updateText(res[0].summary_text);
+    // Preprocess input: normalize whitespace, remove special characters, trim
+    const normalizedInput = inputText
+      .replace(/[^\x00-\x7F]+/g, ' ') // Replace non-ASCII (e.g., ) with space
+      .replace(/\s+/g, ' ')
+      .trim();
+    console.log("Normalized input text:", normalizedInput);
+    console.log("Input length (characters):", normalizedInput.length);
+
+    if (!isSummarizationEngineCreated) {
+      console.log("Creating summarization engine...");
+      try {
+        // Use default summarization model
+        await browser.trial.ml.createEngine({
+          modelHub: "mozilla",
+          taskName: "summarization"
+        });
+        isSummarizationEngineCreated = true;
+        // Attempt to log model info (if API supports)
+        console.log("Summarization engine created, model info (if available):", 
+          await browser.trial.ml.getEngineInfo?.() || "No model info available");
+      } catch (err) {
+        console.error("Failed to load default summarization model:", err.message);
+        throw new Error("Unable to create summarization engine");
+      }
+    } else {
+      console.log("Using existing summarization engine...");
     }
-    return res[0].summary_text;
+
+    console.log("Running summarization inference...");
+    let res = await browser.trial.ml.runEngine({
+      args: [normalizedInput],
+      taskName: "summarization"
+    });
+    console.log("Raw summarization result:", JSON.stringify(res, null, 2));
+    let summary = res[0].summary_text || res[0].text || "No summary returned";
+
+    // Check for potential truncation (incomplete sentence)
+    if (summary.endsWith(" ") || !/[.!?]$/.test(summary.trim())) {
+      console.warn("Summary appears truncated, retrying with shorter input...");
+      const shorterInput = normalizedInput.slice(0, Math.floor(normalizedInput.length * 0.75));
+      console.log("Retrying with shorter input:", shorterInput);
+      res = await browser.trial.ml.runEngine({
+        args: [shorterInput],
+        taskName: "summarization"
+      });
+      console.log("Retry raw summarization result:", JSON.stringify(res, null, 2));
+      summary = res[0].summary_text || res[0].text || "No summary returned";
+      if (summary.endsWith(" ") || !/[.!?]$/.test(summary.trim())) {
+        summary = summary.trim() + "...";
+      }
+    }
+
+    console.log("Extracted summary:", summary);
+    console.log("Summary length (characters):", summary.length);
+    if (useModal) {
+      modal.updateText(summary);
+    }
+    return summary;
   } catch (err) {
-    console.error("Summarization error:", err);
+    console.error("Summarization error:", err.message, err.stack);
     if (useModal) {
       modal.updateText(`Error: ${err.message}`);
     }

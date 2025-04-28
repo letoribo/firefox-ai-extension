@@ -1,6 +1,7 @@
 <!-- This Source Code Form is subject to the terms of the Mozilla Public
    - License, v. 2.0. If a copy of the MPL was not distributed with this
    - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+
 <!doctype html>
 <html lang="en">
   <head>
@@ -36,8 +37,11 @@
         margin-top: 15px;
         padding: 10px;
         border: 1px solid #ccc;
-        min-height: 60px;
-        white-space: pre-wrap;
+        min-height: 80px; /* Increased for visibility */
+        max-height: 200px; /* Limit height to prevent popup overflow */
+        overflow-y: auto; /* Scrollbar for long text */
+        overflow-wrap: break-word; /* Wrap long words */
+        white-space: pre-wrap; /* Preserve formatting */
         background-color: #f9f9f9;
         color: #333;
       }

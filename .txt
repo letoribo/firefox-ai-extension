@@ -3,3 +3,5 @@ https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly
 about:debugging#/runtime/this-firefox
 \\wsl.localhost\Ubuntu-22.04\home\firefox-ai-extension
 manifest.json
+
+Check out our Firefox extension powered by the Firefox AI Runtime! This experimental machine learning runtime brings local, privacy-first AI to your browser using Transformers.js and ONNX Runtime. It runs over 1,000 Hugging Face models directly on your device, keeping your data secure with no server calls. The runtime operates in an isolated process for safety and performance, optimized for Firefox. Our extension leverages this to deliver instant text summarization—condensing articles in a click—and automatic alt-text generation for images, enhancing accessibility. Try it in Firefox Nightly by enabling browser.ml.enable in about:config or visit about:inference. Want to build your own AI-powered extension? Explore the browser.trial.ml API! Share your feedback and join the conversation on Mozilla’s AI Discord: https://discord.gg/Jmmq9mGwy7. Source: Mozilla Docs
