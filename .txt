@@ -1,0 +1,5 @@
+touch manifest.json background.js settings.html settings.js popup.html popup.js content-script.js alt-text-modal.css
+https://www.mozilla.org/en-US/firefox/channel/desktop/#nightly
+about:debugging#/runtime/this-firefox
+\\wsl.localhost\Ubuntu-22.04\home\firefox-ai-extension
+manifest.json

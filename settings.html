@@ -1,0 +1,47 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Firefox AI Extension Settings</title>
+    <style>
+      body.granted #onboard,
+      body:not(.granted) #clear {
+        display: none;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Firefox AI Extension: Alt Text and Text Summarization</h1>
+
+    <p>
+      This extension uses the Firefox AI Runtime to:
+      <ul>
+        <li>Generate alt text for images: Right-click an image and select "✨ Generate Alt Text" from the context menu.</li>
+        <li>Summarize text: Open the extension popup, enter text, and click "Summarize" to get a concise summary.</li>
+      </ul>
+    </p>
+
+    <p id="onboard">
+      This extension requires the Firefox ML engine.
+      <button id="grant">Grant ML Permission</button>
+    </p>
+
+    <button id="clear">Delete Downloaded Models from IndexDB</button>
+
+    <script src="settings.js"></script>
+  </body>
+</html>
