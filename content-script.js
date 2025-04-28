@@ -2,17 +2,51 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-/* globals AltTextModal */
+/**
+ * Simple modal class for displaying text
+ */
+class AltTextModal {
+  constructor() {
+    this.element = document.createElement('div');
+    this.element.className = 'alt-text-modal';
+    this.element.style.display = 'none';
+    document.body.appendChild(this.element);
+  }
+
+  updateText(text) {
+    this.element.textContent = text;
+    this.element.style.display = text ? 'block' : 'none';
+  }
+
+  destroy() {
+    if (this.element) {
+      this.element.remove();
+    }
+  }
+}
 
 /**
- * Returns the modal instance for displaying text.
- * Assumes AltTextModal is defined (replace with actual implementation).
+ * Returns the modal instance for displaying text
  */
 function getModal() {
-  // Placeholder: Assumes AltTextModal is a class  const modal = new AltTextModal();
-  modal.updateText = function(text) {
-    // Update modal text (replace with actual modal logic)
-    console.log("Modal update:", text);
-  };
-  return modal;
+  return new AltTextModal();
 }
+
+/**
+ * Initialize the modal
+ */
+async function initModal() {
+  const modal = getModal();
+  modal.updateText("Initializing...");
+}
+
+// Listen for messages from background script
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("Content script received message:", message);
+  // Handle progress updates or other messages
+  if (message.progress) {
+    const modal = getModal();
+    modal.updateText(`Progress: ${message.progress}`);
+  }
+  sendResponse({ received: true });
+});

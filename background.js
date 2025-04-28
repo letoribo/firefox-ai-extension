@@ -21,7 +21,7 @@ async function generateAltText(targetElementId) {
     });
     modal.updateText(res[0].generated_text);
   } catch (err) {
-    modal.updateText(`${err}`);
+    modal.updateText(`Error: ${err.message}`);
   }
 }
 
@@ -143,49 +143,99 @@ function clearFirstRun(tabId) {
 }
 
 /**
+ * Checks if a tab is scriptable (not privileged or restricted)
+ */
+async function isTabScriptable(tabId) {
+  try {
+    const tab = await browser.tabs.get(tabId);
+    const url = tab.url || '';
+    return !url.startsWith('about:') && !url.startsWith('chrome:') && !url.startsWith('file:');
+  } catch (err) {
+    console.error("Error checking tab scriptability:", err);
+    return false;
+  }
+}
+
+/**
  * Handles context menu click for alt text generation
  */
 async function onclick(info, tab) {
+  if (!(await isTabScriptable(tab.id))) {
+    console.warn("Cannot inject scripts into this tab:", tab.url);
+    const modal = getModal();
+    modal.updateText("Error: Cannot generate alt text on this page.");
+    return;
+  }
+
   if (isFirstRun(tab.id)) {
-    browser.tabs.insertCSS(tab.id, {
-      file: "./alt-text-modal.css",
-    });
+    try {
+      await browser.tabs.insertCSS(tab.id, {
+        file: "./alt-text-modal.css",
+      });
+    } catch (err) {
+      console.error("Failed to insert CSS:", err);
+    }
   }
 
   const listener = progressData => {
-    browser.tabs.sendMessage(tab.id, progressData);
+    browser.tabs.sendMessage(tab.id, progressData).catch(err => {
+      console.warn("Failed to send progress message:", err.message);
+    });
   };
 
   browser.trial.ml.onProgress.addListener(listener);
   try {
     if (isFirstRun(tab.id)) {
-      // Injecting content-script.js, which creates the AltTextModal instance
-      await browser.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ["./content-script.js"],
-      });
+      // Injecting content-script.js
+      try {
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ["./content-script.js"],
+        });
+        console.log("Content script injected successfully");
+      } catch (err) {
+        console.error("Failed to inject content script:", err);
+        throw new Error("Unable to inject content script");
+      }
 
       // Running initModal
+      try {
+        await browser.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: initModal,
+        });
+      } catch (err) {
+        console.error("Failed to initialize modal:", err);
+        throw new Error("Unable to initialize modal");
+      }
+
+      // Create image-to-text engine
+      try {
+        await browser.trial.ml.createEngine({
+          modelHub: "mozilla",
+          taskName: "image-to-text",
+        });
+      } catch (err) {
+        console.error("Failed to create image-to-text engine:", err);
+        throw new Error("Unable to create image-to-text engine");
+      }
+    }
+
+    // Running generateAltText
+    try {
       await browser.scripting.executeScript({
         target: { tabId: tab.id },
-        func: initModal,
+        func: generateAltText,
+        args: [info.targetElementId],
       });
-
-      await browser.trial.ml.createEngine({
-        modelHub: "mozilla",
-        taskName: "image-to-text",
-      });
+    } catch (err) {
+      console.error("Failed to run generateAltText:", err);
+      throw new Error("Unable to generate alt text");
     }
-    // Running generateAltText
-    await browser.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: generateAltText,
-      args: [info.targetElementId],
-    });
   } catch (err) {
     console.error("Error in onclick handler:", err);
     const modal = getModal();
-    modal.updateText(`Error: ${err}`);
+    modal.updateText(`Error: ${err.message}`);
   } finally {
     browser.trial.ml.onProgress.removeListener(listener);
     setFirstRun(tab.id, false);
@@ -198,9 +248,10 @@ async function onclick(info, tab) {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "summarize") {
     const listener = progressData => {
-      // Optionally send progress to popup or tab
       if (sender.tab?.id) {
-        browser.tabs.sendMessage(sender.tab.id, progressData);
+        browser.tabs.sendMessage(sender.tab.id, progressData).catch(err => {
+          console.warn("Failed to send progress message:", err.message);
+        });
       }
     };
 
@@ -208,42 +259,36 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     (async () => {
       try {
-        // Check if the request comes from a tab (content script) or popup
         const isTabContext = !!sender.tab?.id;
         let summary;
 
         if (isTabContext) {
           const tabId = sender.tab.id;
           if (isFirstRun(tabId)) {
-            // Inject CSS and content script for modal
+            if (!(await isTabScriptable(tabId))) {
+              throw new Error("Cannot inject scripts into this tab");
+            }
             await browser.tabs.insertCSS(tabId, {
               file: "./alt-text-modal.css",
             });
-
             await browser.scripting.executeScript({
               target: { tabId: tabId },
               files: ["./content-script.js"],
             });
-
-            // Initialize modal
             await browser.scripting.executeScript({
               target: { tabId: tabId },
               func: initModal,
             });
-
             setFirstRun(tabId, false);
           }
-
-          // Run summarization in the tab with modal
           summary = (await browser.scripting.executeScript({
             target: { tabId: tabId },
             func: summarizeText,
-            args: [message.text, true], // Enable modal
+            args: [message.text, true],
           }))[0].result;
         } else {
-          // Run summarization in background for popup
           console.log("Processing popup summarization request...");
-          summary = await summarizeText(message.text, false); // No modal
+          summary = await summarizeText(message.text, false);
           console.log("Sending summary to popup:", summary);
         }
 
