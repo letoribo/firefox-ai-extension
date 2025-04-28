@@ -14,7 +14,9 @@ class AltTextModal {
   }
 
   updateText(text) {
-    this.element.textContent = text;
+    // Format error messages with newlines for readability
+    const formattedText = text.replace(/\n/g, '<br>').replace(/(\d\.)/g, '<br>$1');
+    this.element.innerHTML = formattedText;
     this.element.style.display = text ? 'block' : 'none';
   }
 
@@ -36,17 +38,21 @@ function getModal() {
  * Initialize the modal
  */
 async function initModal() {
-  const modal = getModal();
-  modal.updateText("Initializing...");
+  getModal().updateText("Initializing...");
 }
 
 // Listen for messages from background script
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Content script received message:", message);
-  // Handle progress updates or other messages
+  const modal = getModal();
   if (message.progress) {
-    const modal = getModal();
     modal.updateText(`Progress: ${message.progress}`);
+  } else if (message.error) {
+    modal.updateText(`Error: ${message.error}`);
+  } else if (message.action === "displayAltText") {
+    modal.updateText(message.text);
+  } else if (message.action === "displaySummary") {
+    modal.updateText(message.text);
   }
   sendResponse({ received: true });
 });
